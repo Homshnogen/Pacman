@@ -138,8 +138,6 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.top = y
         self.rect.left = x
-        self.prev_x = x
-        self.prev_y = y
         self.change_x=0
         self.change_y=0
       
@@ -160,24 +158,16 @@ class Player(pygame.sprite.Sprite):
         
         old_x=self.rect.left
         new_x=old_x+self.change_x
-        prev_x=old_x+self.prev_x
         self.rect.left = new_x
         
         old_y=self.rect.top
         new_y=old_y+self.change_y
-        prev_y=old_y+self.prev_y
 
         # Did this update cause us to hit a wall?
         x_collide = pygame.sprite.spritecollide(self, walls, False)
         if x_collide:
             # Whoops, hit a wall. Go back to the old position
             self.rect.left=old_x
-            # self.rect.top=prev_y
-            # y_collide = pygame.sprite.spritecollide(self, walls, False)
-            # if y_collide:
-            #     # Whoops, hit a wall. Go back to the old position
-            #     self.rect.top=old_y
-            #     print('a')
         else:
 
             self.rect.top = new_y
@@ -187,14 +177,8 @@ class Player(pygame.sprite.Sprite):
             if y_collide:
                 # Whoops, hit a wall. Go back to the old position
                 self.rect.top=old_y
-                # self.rect.left=prev_x
-                # x_collide = pygame.sprite.spritecollide(self, walls, False)
-                # if x_collide:
-                #     # Whoops, hit a wall. Go back to the old position
-                #     self.rect.left=old_x
-                #     print('b')
 
-        if gate != False:
+        if gate:
           gate_hit = pygame.sprite.spritecollide(self, gate, False)
           if gate_hit:
             self.rect.left=old_x
@@ -204,6 +188,7 @@ class Player(pygame.sprite.Sprite):
 class Ghost(Player):
     # Constructor function
     def __init__(self,x,y, filename, list, ghost):
+        self.args = x, y, filename, list, ghost
         # Call Player constructor
         Player.__init__(self, x, y, filename)
         self.list = list
@@ -211,6 +196,10 @@ class Ghost(Player):
         self.ghost = ghost
         self.turn = 0
         self.steps = 0
+    # Multiply every 30 seconds
+    def multiply(self):
+        # Return copy of this ghost
+        return Ghost(*self.args)
     # Change the speed of the ghost
     def changespeed(self):
       z=self.list[self.turn][2]
@@ -228,7 +217,7 @@ class Ghost(Player):
       self.change_y=self.list[self.turn][1]
 
 Pinky_directions = [
-[0,-30,4],
+[0,-15,4],
 [15,0,9],
 [0,15,11],
 [-15,0,23],
@@ -280,7 +269,7 @@ Blinky_directions = [
 ]
 
 Inky_directions = [
-[30,0,2],
+[15,0,2],
 [0,-15,4],
 [15,0,10],
 [0,15,7],
@@ -314,7 +303,7 @@ Inky_directions = [
 ]
 
 Clyde_directions = [
-[-30,0,2],
+[-15,0,2],
 [0,-15,4],
 [15,0,5],
 [0,15,7],
@@ -366,8 +355,8 @@ w = 303-16 #Width
 p_h = (7*60) + 19 #Pacman height
 m_h = (4*60) + 19 #Monster height
 b_h = (3*60) + 19 #Binky height
-i_w = w - 32 #Inky width
-c_w = w + 32 #Clyde width
+i_w = w - 30 #Inky width
+c_w = w + 30 #Clyde width
 
 def startGame():
 
@@ -401,7 +390,7 @@ def startGame():
   monsta_list.add(Pinky)
   all_sprites_list.add(Pinky)
    
-  Inky = Ghost( i_w, m_h, "images/Inky.png", Inky_directions, None)
+  Inky = Ghost(i_w, m_h, "images/Inky.png", Inky_directions, None)
   monsta_list.add(Inky)
   all_sprites_list.add(Inky)
    
@@ -465,6 +454,18 @@ def startGame():
       # ALL EVENT PROCESSING SHOULD GO ABOVE THIS COMMENT
    
       # ALL GAME LOGIC SHOULD GO BELOW THIS COMMENT
+      if len(monsta_list) >= 128:
+        return doNext("Game Over", 235)
+
+      countdown -= clock.get_time()/1000
+      if countdown <= 0 :
+        countdown += 30
+        for ghost in monsta_list:
+          new_ghost = ghost.multiply()
+          monsta_list.add(new_ghost)
+          all_sprites_list.add(new_ghost)
+
+
       Pacman.update(wall_list,gate)
 
       for ghost in monsta_list:
@@ -475,8 +476,8 @@ def startGame():
       blocks_hit_list = pygame.sprite.spritecollide(Pacman, block_list, True)
        
       # Check the list of collisions.
-      if len(blocks_hit_list) > 0:
-          score +=len(blocks_hit_list)
+      if blocks_hit_list:
+          score += len(blocks_hit_list)
       
       # ALL GAME LOGIC SHOULD GO ABOVE THIS COMMENT
    
@@ -490,20 +491,22 @@ def startGame():
 
       text=font.render(f"Score: {score}/{max_points}", True, red)
       screen.blit(text, [10, 10])
+      text=font.render(f"multiply in {float(countdown)} seconds", True, red)
+      screen.blit(text, [310, 10])
 
       if score == max_points:
         return doNext("Congratulations, you won!",145)
 
-      monsta_hit_list = pygame.sprite.spritecollide(Pacman, monsta_list, False)
+      monsta_hit_list = pygame.sprite.spritecollide(Pacman, monsta_list, True)
 
       if monsta_hit_list:
-        return doNext("Game Over",235)
+        print(len(all_sprites_list))
 
       # ALL CODE TO DRAW SHOULD GO ABOVE THIS COMMENT
       
       pygame.display.flip()
     
-      countdown -= clock.tick(10) / 1000
+      clock.tick(10)
 
 def doNext(message,left):
   clock = pygame.time.Clock()
